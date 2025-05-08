@@ -2,15 +2,15 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// Use the direct config values instead of environment variables
+// Use environment variables for config values
 const firebaseConfig = {
-  apiKey: "AIzaSyB2pm-3FYDBp5EWYju_trv6wQGYjPZEJwo",
-  authDomain: "cardata-17759.firebaseapp.com",
-  projectId: "cardata-17759",
-  storageBucket: "cardata-17759.appspot.com", // Note: Fixed the storage bucket URL
-  messagingSenderId: "344330794379",
-  appId: "1:344330794379:web:ee3a7093fd9fb1b490eb8e",
-  measurementId: "G-YR5NF4L3BW"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

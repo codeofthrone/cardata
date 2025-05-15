@@ -1,6 +1,34 @@
 import { Helmet } from "react-helmet";
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function DashboardB() {
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      try {
+        setLoading(true);
+        const vehiclesRef = collection(db, "vehicles");
+        const snapshot = await getDocs(vehiclesRef);
+        const vehicleData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setVehicles(vehicleData);
+        console.log("獲取到的車輛資料:", vehicleData);
+      } catch (error) {
+        console.error("獲取車輛資料時出錯:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVehicles();
+  }, []);
+  
   return (
     <div className="container py-4">
       <Helmet>
@@ -75,11 +103,54 @@ export default function DashboardB() {
       
       <div className="card shadow">
         <div className="card-body">
-          <h2 className="card-title h5 fw-semibold mb-4">最近活動</h2>
+          <h2 className="card-title h5 fw-semibold mb-4">車輛資料</h2>
           <hr className="my-3" />
-          <div className="text-center py-4 text-muted">
-            暫無活動記錄
-          </div>
+          
+          {loading ? (
+            <div className="text-center py-4">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">載入中...</span>
+              </div>
+              <p className="mt-2 text-muted">載入車輛資料中...</p>
+            </div>
+          ) : vehicles.length > 0 ? (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th scope="col">車牌號碼</th>
+                    <th scope="col">品牌/型號</th>
+                    <th scope="col">CC數</th>
+                    <th scope="col">顏色</th>
+                    <th scope="col">狀態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vehicles.map(vehicle => (
+                    <tr key={vehicle.id}>
+                      <td>{vehicle.plateNumber || '未設定'}</td>
+                      <td>{vehicle.brand} {vehicle.model}</td>
+                      <td>{vehicle.cc || '未設定'}</td>
+                      <td>{vehicle.color || '未設定'}</td>
+                      <td>
+                        <span className={`badge ${vehicle.status === 'active' ? 'bg-success' : 'bg-warning text-dark'}`}>
+                          {vehicle.status === 'active' ? '正常' : '草稿'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-4 text-muted">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-car-front text-secondary mb-3" viewBox="0 0 16 16">
+                <path d="M4 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm10 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6 8a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H6ZM4.862 4.276 3.906 6.19a.51.51 0 0 0 .497.731c.91-.073.995-.375 1.076-.928.086-.553.342-1.29.342-1.29a.5.5 0 0 1 .497-.731c.91.073.995.375 1.076.929.086.552.342 1.29.342 1.29a.5.5 0 0 0 .497-.731l-.956-1.913A.5.5 0 0 0 6.826 4H5.9a.5.5 0 0 0-.447.276ZM2.5 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm11 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-11 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm5.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm5.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>
+                <path d="M9.89 4.765A1.5 1.5 0 0 0 8.5 4h-1a1.5 1.5 0 0 0-1.39.765L5.354 6H2a.5.5 0 0 0-.5.5v4A2.5 2.5 0 0 0 4 13h8a2.5 2.5 0 0 0 2.5-2.5v-4a.5.5 0 0 0-.5-.5h-3.354l-.756-1.235ZM2.5 7.5V10h11V7.5h-11Z"/>
+              </svg>
+              <p>暫無車輛資料</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

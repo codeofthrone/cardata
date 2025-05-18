@@ -20,13 +20,11 @@ export default function ModelCCSelector({ onSelect }) {
   const [selectedCC, setSelectedCC] = useState("");
   const [customCC, setCustomCC] = useState("");
   
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   
   // 獲取品牌列表
   useEffect(() => {
     const getBrands = async () => {
-      setLoading(true);
       setError("");
       try {
         const brandData = await fetchBrands();
@@ -34,8 +32,6 @@ export default function ModelCCSelector({ onSelect }) {
       } catch (err) {
         console.error("獲取品牌列表時出錯:", err);
         setError("獲取品牌列表失敗");
-      } finally {
-        setLoading(false);
       }
     };
     
@@ -51,7 +47,6 @@ export default function ModelCCSelector({ onSelect }) {
     }
     
     const getModels = async () => {
-      setLoading(true);
       setError("");
       try {
         const modelData = await fetchModelsByBrand(selectedBrand);
@@ -59,8 +54,6 @@ export default function ModelCCSelector({ onSelect }) {
       } catch (err) {
         console.error(`獲取品牌(${selectedBrand})的車型時出錯:`, err);
         setError("獲取車型列表失敗");
-      } finally {
-        setLoading(false);
       }
     };
     
@@ -193,7 +186,7 @@ export default function ModelCCSelector({ onSelect }) {
               className="form-select" 
               value={selectedBrand} 
               onChange={handleBrandChange}
-              disabled={loading || brands.length === 0}
+              disabled={brands.length === 0}
             >
               <option value="">請選擇品牌</option>
               {brands.map(brand => (
@@ -211,7 +204,7 @@ export default function ModelCCSelector({ onSelect }) {
               className="form-select" 
               value={selectedModel} 
               onChange={handleModelChange}
-              disabled={loading || !selectedBrand || models.length === 0}
+              disabled={!selectedBrand || models.length === 0}
             >
               <option value="">請選擇車型</option>
               {models.map(model => (
@@ -229,7 +222,7 @@ export default function ModelCCSelector({ onSelect }) {
               className="form-select" 
               value={selectedCC} 
               onChange={handleCCChange}
-              disabled={loading || !selectedModel}
+              disabled={!selectedModel}
             >
               <option value="">請選擇CC數</option>
               {ccValues.map(cc => (
@@ -248,21 +241,17 @@ export default function ModelCCSelector({ onSelect }) {
                 <input 
                   type="number" 
                   className="form-control" 
-                  placeholder="請輸入CC數值" 
                   value={customCC}
                   onChange={handleCustomCCChange}
-                  disabled={loading}
+                  placeholder="請輸入CC數值"
                 />
-                <span className="input-group-text">cc</span>
                 <button 
                   className="btn btn-primary" 
                   onClick={handleAddCustomCC}
-                  disabled={loading || !customCC}
                 >
-                  {loading ? "處理中..." : "新增"}
+                  添加
                 </button>
               </div>
-              <div className="form-text">請輸入有效的CC數值，例如：1800、2000等</div>
             </div>
           )}
         </div>

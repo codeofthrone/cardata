@@ -1,69 +1,137 @@
-import { useState } from "react";
-import DashboardA from "./pages/DashboardA";
-import DashboardB from "./pages/DashboardB";
-import DashboardC from "./pages/DashboardC";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+import DashboardA from './pages/DashboardA';
+import DashboardB from './pages/DashboardB';
+import DashboardC from './pages/DashboardC';
+import AppIcons from './components/AppIcons';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import { config } from './config';
+import { useState, useEffect } from 'react';
 
-function App() {
-  // 暫時移除登入系統，直接設定角色
-  const [role, setRole] = useState("A"); // 預設顯示DashboardA
-  
+function PrivateRoute({ children }) {
+  const { currentUser } = useAuth();
+  return currentUser ? children : <Navigate to="/login" />;
+}
+
+function AppContent() {
+  const { currentUser, logout } = useAuth();
+  // 使用用戶的role屬性作為初始值，如果沒有則使用config中的defaultRole
+  const [role, setRole] = useState(() => {
+    return currentUser?.role || config.dashboard.defaultRole;
+  });
+
   // 切換角色的功能
   const switchRole = (newRole) => {
     setRole(newRole);
   };
 
+  // 當用戶信息更新時，更新角色
+  useEffect(() => {
+    if (currentUser?.role) {
+      setRole(currentUser.role);
+    } else if (currentUser && currentUser.uid) {
+      // 如果用戶存在但角色缺失，設置默認角色
+      console.log(`用戶 ${currentUser.uid} 已登入，但角色數據缺失，使用默認角色`);
+      setRole(config.dashboard.defaultRole);
+    }
+  }, [currentUser]);
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <a className="flex items-center" href="#">
-                <svg className="text-blue-600" width="32" height="32" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <span className="ml-2 font-semibold text-gray-900">車輛管理系統</span>
-              </a>
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-white shadow-sm">
+        <div className="container">
+          <div className="d-flex align-items-center justify-content-between py-3">
+            {/* 車輛管理系統 */}
+            <div className="d-flex align-items-center">
+              <DirectionsCarIcon className="text-primary me-2" />
+              <span className="h5 mb-0 fw-bold">車輛管理系統</span>
             </div>
             
-            <div className="flex items-center">
-              <div className="mr-4">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {role === "A" ? "管理員" : role === "B" ? "維修人員" : "一般用戶"}
-                </span>
-              </div>
-              
-              <div className="inline-flex rounded-md shadow-sm">
+            {/* 角色切換按鈕 */}
+            {!config.dashboard.hideRoleSwitcher && (
+              <div className="btn-group mx-3">
                 <button 
-                  className={`px-4 py-2 text-sm font-medium ${role === "A" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"} border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200`}
+                  className={`btn ${role === "A" ? "btn-primary" : "btn-outline-primary"}`}
                   onClick={() => switchRole("A")}
                 >
                   入庫介面
                 </button>
                 <button 
-                  className={`px-4 py-2 text-sm font-medium ${role === "B" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"} border-t border-b border-r border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200`}
+                  className={`btn ${role === "B" ? "btn-primary" : "btn-outline-primary"}`}
                   onClick={() => switchRole("B")}
                 >
                   維修介面
                 </button>
                 <button 
-                  className={`px-4 py-2 text-sm font-medium ${role === "C" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"} border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200`}
+                  className={`btn ${role === "C" ? "btn-primary" : "btn-outline-primary"}`}
                   onClick={() => switchRole("C")}
                 >
                   總覽介面
                 </button>
               </div>
-            </div>
+            )}
+            
+            {/* 登出按鈕 */}
+            <button
+              onClick={logout}
+              className="btn btn-danger"
+            >
+              登出
+            </button>
           </div>
         </div>
       </nav>
       
-      <div className="py-6">
-        {role === "A" && <DashboardA />}
-        {role === "B" && <DashboardB />}
-        {role === "C" && <DashboardC />}
+      <div className="py-4">
+        {config.dashboard.showAll ? (
+          <div className="container">
+            <div className="mb-4">
+              <h2 className="h5 mb-3">入庫介面</h2>
+              <DashboardA />
+            </div>
+            <div className="mb-4">
+              <h2 className="h5 mb-3">維修介面</h2>
+              <DashboardB />
+            </div>
+            <div className="mb-4">
+              <h2 className="h5 mb-3">總覽介面</h2>
+              <DashboardC />
+            </div>
+          </div>
+        ) : (
+          <div className="container">
+            {role === "A" && <DashboardA />}
+            {role === "B" && <DashboardB />}
+            {role === "C" && <DashboardC />}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <PrivateRoute>
+                <AppContent />
+              </PrivateRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
+    </Router>
   );
 }
 

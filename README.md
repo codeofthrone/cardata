@@ -34,43 +34,101 @@
 ```
 ├── src/                  # 源代碼
 │   ├── pages/            # 不同頁面的React組件
-│   │   ├── DashboardA.jsx
-│   │   ├── DashboardB.jsx
-│   │   ├── DashboardC.jsx
-│   │   ├── Login.jsx
-│   │   └── VehicleList.jsx
+│   │   ├── DashboardA.jsx  # 入庫管理介面
+│   │   ├── DashboardB.jsx  # 維修管理介面
+│   │   └── DashboardC.jsx  # 車輛總覽介面
 │   ├── components/       # 可重用組件
-│   │   └── ModelCCSelector.jsx
 │   ├── utils/            # 工具函數
-│   │   └── firestoreModelCC.js
 │   ├── App.jsx           # 主應用程序組件
 │   ├── firebase.js       # Firebase配置
 │   ├── index.css         # 全局樣式
 │   └── main.jsx          # 應用程序入口點
-├── dataconnect/          # Firebase DataConnect配置
-├── docs/                 # 項目文檔
-│   └── firestore-model-cc-design.md
-├── scripts/              # 腳本工具
-│   └── migrate-model-cc-data.js
-├── firebaseconfig.js     # Firebase配置（替代）
-├── upload_to_firestore.js # 數據上傳工具
-├── kingautos_results.json # 上傳的源數據
-└── firebase.json         # Firebase配置文件
 ```
+## 檔案執行流程
+
+1. **程式入口點**：
+   - [main.jsx](src/main.jsx) - 應用程序入口點，初始化React應用並註冊Service Worker
+   - [App.jsx](src/App.jsx) - 主應用元件，設置路由並包含[AuthProvider](src/contexts/AuthContext.jsx)
+
+2. **核心模組**：
+   - [AuthContext.jsx](src/contexts/AuthContext.jsx) - 認證上下文，管理用戶登入狀態和權限
+   - [firebase.js](src/firebase.js) - Firebase服務初始化和配置
+
+3. **頁面元件**：
+   - [Login.jsx](src/pages/Login.jsx) - 登入頁面
+   - [DashboardA.jsx](src/pages/DashboardA.jsx) - 入庫管理模組 (A權限)
+   - [DashboardB.jsx](src/pages/DashboardB.jsx) - 維修管理模組 (B權限)
+   - [DashboardC.jsx](src/pages/DashboardC.jsx) - 車輛總覽模組 (C權限)
+
+4. **工具和組件**：
+   - [firestoreModelCC.js](src/utils/firestoreModelCC.js) - 處理品牌、車型和CC數值的Firestore操作
+
+## 使用者登入流程
+
+1. **登入過程**：
+   - 用戶進入應用後，[AuthContext](src/contexts/AuthContext.jsx)檢查登入狀態
+   - 未登入用戶被導向[登入頁面](src/pages/Login.jsx)
+   - 用戶輸入郵箱和密碼，點擊登入按鈕
+   - `Login.jsx`執行`handleSubmit`函數，調用`AuthContext`的`login`方法
+
+2. **認證處理**：
+   - `AuthContext.jsx`中的`login`函數使用Firebase Authentication驗證用戶
+   - 登入成功後，`onAuthStateChanged`監聽器被觸發
+   - 系統透過`fetchUserByEmail`函數檢查用戶在Firestore的文檔
+
+3. **用戶數據處理**：
+   - 如用戶文檔存在：加載用戶角色和公司信息
+   - 如用戶文檔不存在：創建新用戶記錄，設置默認權限 (通常為C權限)
+   - 用戶信息被存儲在`currentUser`狀態中，可通過`useAuth`鉤子在整個應用中訪問
+
+4. **權限路由**：
+   - 登入成功後，用戶被導航到首頁
+   - [App.jsx](src/App.jsx)根據用戶角色顯示對應界面切換選項(A、B或C)
+   - 用戶可點擊界面按鈕切換不同模組，或使用`logout`功能登出
+
+### 用戶角色與權限
+- **A權限**：入庫管理模組，可新增和編輯車輛資料
+- **B權限**：維修管理模組，可記錄維修項目、費用和上傳發票
+- **C權限**：車輛總覽模組，查看所有車輛信息和篩選功能
+
+### 測試帳號
+| 角色 | 電子郵件 | 密碼 |
+|------|----------|------|
+| A權限 | a062977sweet+1@gmail.com | 123456 |
+| B權限 | a062977sweet+2@gmail.com | 123456 |
+| C權限 | a062977sweet+2@gmail.com | 123456 |
+
+
+
+## Firebase 資料結構
+
+### Collections
+1. **vehicles**
+   - 儲存所有車輛基本資訊
+   - 欄位：brand, model, plateNumber, year, color, cc, equipment, category, location, deposit, notes, status, createdAt, updatedAt
+
+2. **repairs**
+   - 儲存所有維修紀錄
+   - 欄位：vehicleId, item, location, date, partNumber, cost, status, invoiceUrl, createdAt
+
+3. **settings/brands/models**
+   - 儲存品牌和車型資料
+   - 結構：
+     ```
+     settings/
+       brands/
+         models/
+           {brandId}/
+             model_list/
+               {modelId}/
+                 ccs: [cc1, cc2, ...]
+     ```
+
+4. **settings/options**
+   - 儲存系統選項設定
+   - 欄位：colors, types, years
 
 ## 設置說明
-
-### 先決條件
--登入 Dashboard 帳號密碼：
-DashboardA: #入庫模組
-- 帳號：a062977sweet+1@gmail.com
-- 密碼：123456
-DashboardB: #維修模組
-- 帳號：a062977sweet+2@gmail.com
-- 密碼：123456
-DashboardC: #車輛總覽模組
-- 帳號：a062977sweet+2@gmail.com
-- 密碼：123456
 
 ### 安裝
 1. 克隆存儲庫
@@ -94,8 +152,6 @@ DashboardC: #車輛總覽模組
    VITE_APP_ID=your-app-id
    ```
 
-4. 對於數據上傳工具，下載您的Firebase服務帳戶密鑰，並將其保存為`cardata-17759-firebase-adminsdk.json`在項目根目錄中。
-
 ### 運行應用程序
 
 #### 開發模式
@@ -113,29 +169,6 @@ npm run build
 ```bash
 npm run preview
 ```
-
-## 數據上傳工具
-
-該項目包括一個用於將車輛數據從JSON文件上傳到Firestore的工具腳本：
-
-1. 確保您在項目根目錄中擁有服務帳戶密鑰文件（`cardata-17759-firebase-adminsdk.json`）
-2. 在`kingautos_results.json`文件中準備您的數據
-3. 運行上傳腳本：
-   ```bash
-   node upload_to_firestore.js
-   ```
-
-該腳本將品牌和型號信息上傳到Firestore集合。
-
-## Firebase集合
-
-應用程序使用以下Firestore集合：
-
-- **users**：用戶信息，包括角色
-- **vehicles**：車輛信息（品牌，型號，車牌號）
-- **brands**：車輛品牌
-- **models**：車輛型號
-- **settings**：應用程序設置
 
 ## 部署
 

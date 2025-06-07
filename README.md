@@ -13,10 +13,17 @@
    - 車輛資訊欄位：廠牌、車型、車牌、年份、顏色、CC、配備、類別、位置、收訂日期、備註
 
 2. **維修與花費管理模組（權限B）**
-   - 為特定車輛新增維修紀錄
+   - 顯示當前登入用戶所屬公司的車輛列表
+   - 提供車輛搜尋功能 (依車牌、品牌、型號)
+   - 提供車輛篩選功能 (依狀態、品牌、型號)
+   - 為特定車輛新增維修紀錄（使用車輛文檔內的 `repairParts` 陣列）
    - 維修項目、地點、時間、料號、費用
-   - 可上傳維修發票或照片（存入 Firebase Storage）
-   - 自動彙總各車輛總花費
+   - 可上傳維修發票或照片（存入 Firebase Storage，使用車輛特定路徑）
+   - 顯示每台車輛的維修項目數及相關費用 (已付款、未付款、總金額)
+   - **車牌點擊功能**：點擊車牌彈出維修清單模態框，支援付款狀態切換
+   - 自動彙總各車輛總花費（從維修記錄陣列計算）
+   - 支援維修狀態即時更新（待處理 ↔ 已完成）
+   - 即時更新維修進度和費用統計
 
 3. **車輛總覽與篩選模組（權限C）**
    - 顯示所有車輛清單（支援分頁）
@@ -36,13 +43,23 @@
 │   ├── pages/            # 不同頁面的React組件
 │   │   ├── DashboardA.jsx  # 入庫管理介面
 │   │   ├── DashboardB.jsx  # 維修管理介面
-│   │   └── DashboardC.jsx  # 車輛總覽介面
+│   │   ├── DashboardC.jsx  # 車輛總覽介面
+│   │   ├── Login.jsx       # 登入頁面
+│   │   └── VehicleList.jsx # 車輛列表組件
 │   ├── components/       # 可重用組件
 │   ├── utils/            # 工具函數
+│   │   ├── firestoreVehicleRepairs.js # 車輛維修子集合操作（備用架構）
+│   │   ├── firestoreRepairs.js        # 舊維修系統（已棄用）
+│   │   ├── firebaseStorage.js         # 檔案上傳工具
+│   │   └── firestoreModelCC.js        # 車型/CC資料處理
+│   ├── contexts/         # React Context
+│   │   └── AuthContext.jsx  # 身份驗證上下文
 │   ├── App.jsx           # 主應用程序組件
 │   ├── firebase.js       # Firebase配置
 │   ├── index.css         # 全局樣式
 │   └── main.jsx          # 應用程序入口點
+├── scripts/              # 工具腳本
+│   └── migrate-repairs-to-subcollection.js # 資料遷移腳本
 ```
 ## 檔案執行流程
 
@@ -102,14 +119,35 @@
 
 ## Firebase 資料結構
 
-### Collections
-1. **vehicles**
-   - 儲存所有車輛基本資訊
-   - 欄位：brand, model, plateNumber, year, color, cc, equipment, category, location, deposit, notes, status, createdAt, updatedAt
+### 當前實作架構
 
-2. **repairs**
-   - 儲存所有維修紀錄
-   - 欄位：vehicleId, item, location, date, partNumber, cost, status, invoiceUrl, createdAt
+**維修資料儲存方式**：系統採用車輛文檔內的 `repairParts` 陣列來儲存維修記錄，而非使用子集合架構。
+
+**設計優勢**：
+- **簡化權限控制**：避免子集合路徑的複雜安全規則
+- **提升查詢效能**：單次讀取獲得車輛和維修資料
+- **確保資料一致性**：維修記錄直接隸屬於車輛文檔
+- **簡化前端邏輯**：統一資料來源和處理邏輯
+
+### Collections
+
+1. **vehicles**
+   - 儲存所有車輛基本資訊和維修記錄
+   - 基本欄位：brand, model, plateNumber, year, color, cc, equipment, category, location, deposit, notes, status, createdAt, updatedAt, company
+   - **repairParts** (Array)：維修記錄陣列
+     - `part`: 維修部位
+     - `cost`: 金額
+     - `status`: 維修狀態 ("pending", "done")
+     - `date`: 維修日期
+     - `location`: 維修地點
+     - `partNumber`: 料號
+     - `invoiceUrl`: 發票/照片URL
+     - `userId`: 操作用戶ID
+     - `createdAt`: 記錄建立時間
+     - `updatedAt`: 記錄更新時間
+
+2. **repairs** (已棄用)
+   - 舊的維修記錄集合，已遷移至車輛文檔的 repairParts 陣列
 
 3. **settings/brands/models**
    - 儲存品牌和車型資料
@@ -168,6 +206,52 @@ npm run build
 #### 預覽生產構建
 ```bash
 npm run preview
+```
+
+## 資料架構說明
+
+### 當前維修資料儲存方式
+
+**實作策略**：採用車輛文檔內的 `repairParts` 陣列儲存維修記錄
+
+**架構優勢**：
+- **簡化權限控制**：避免子集合路徑的複雜安全規則設定
+- **提升查詢效能**：單次讀取即可獲得車輛和維修資料
+- **確保資料一致性**：維修記錄直接隸屬於車輛文檔
+- **簡化前端邏輯**：統一資料來源，減少同步問題
+
+### 功能特色
+
+**DashboardB 車牌點擊功能**：
+- 點擊車牌號碼彈出維修清單模態框
+- 即時顯示維修項目、金額和付款狀態
+- 支援一鍵切換付款狀態（pending ↔ done）
+- 自動計算已付款、未付款和總金額統計
+
+### 資料結構彈性設計
+
+**當前實作**：陣列結構（`vehicle.repairParts`）
+**備用方案**：子集合結構（已完成開發，可在需要時切換）
+**遷移工具**：已完成子集合遷移腳本，保留作為未來擴展選項
+
+### 開發工具腳本
+
+#### 測試車輛維修功能
+```bash
+node scripts/test-vehicle-repairs.js
+```
+
+#### 資料遷移（備用）
+如需切換至子集合架構：
+
+**檢查遷移狀態**
+```bash
+node scripts/migrate-repairs-to-subcollection.js --check
+```
+
+**執行資料遷移**
+```bash
+node scripts/migrate-repairs-to-subcollection.js --migrate
 ```
 
 ## 部署

@@ -106,6 +106,9 @@ export default function DashboardC() {
   useEffect(() => {
     let filtered = vehicles;
     
+    // 預設過濾掉已售出的車輛
+    filtered = filtered.filter(vehicle => !vehicle.sold);
+    
     // 應用搜尋篩選
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
@@ -143,7 +146,8 @@ export default function DashboardC() {
       statusFilter,
       brandFilter,
       modelFilter,
-      companyFilter
+      companyFilter,
+      hideSold: true
     });
     
     setFilteredVehicles(filtered);
@@ -209,17 +213,17 @@ export default function DashboardC() {
       );
       
       const snapshot = await getDocs(vehiclesQuery);
-      vehicleData = snapshot.docs.map(doc => ({
+      const updatedVehicleData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
       
       // 添加更詳細的控制台輸出
-      console.log("提交後獲取到的所有車輛資料:", vehicleData);
-      console.log("提交後車輛總數:", vehicleData.length);
+      console.log("提交後獲取到的所有車輛資料:", updatedVehicleData);
+      console.log("提交後車輛總數:", updatedVehicleData.length);
       
-      setVehicles(vehicleData);
-      setFilteredVehicles(vehicleData);
+      setVehicles(updatedVehicleData);
+      setFilteredVehicles(updatedVehicleData);
     } catch (error) {
       console.error("儲存車輛時出錯:", error);
     } finally {
@@ -259,7 +263,7 @@ export default function DashboardC() {
         <title>車輛總覽</title>
       </Helmet>
       
-      <div className="row mb-4 align-items-center">
+      {/* <div className="row mb-4 align-items-center">
         <div className="col">
           <h1 className="fw-bold d-flex align-items-center gap-2">
             <DirectionsCarIcon className="text-primary" />
@@ -272,7 +276,7 @@ export default function DashboardC() {
             {new Date().toLocaleDateString('zh-TW')}
           </small>
         </div>
-      </div>
+      </div> */}
       
       <div className="card shadow mb-4">
         <div className="card-body">

@@ -49,7 +49,7 @@ function AppContent() {
             {/* 車輛管理系統 */}
             <div className="d-flex align-items-center">
               <DirectionsCarIcon className="text-primary me-2" />
-              <span className="h5 mb-0 fw-bold">車輛管理系統</span>
+              <span className="h5 mb-0 fw-bold">車輛管理系統 - {role === "A" ? "入庫介面" : role === "B" ? "維修介面" : "總覽介面"}</span>
             </div>
             
             {/* 角色切換按鈕 */}

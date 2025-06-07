@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'A';
+    }
+    
+    function isRepairStaff() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'B';
+    }
+    
+    function isViewer() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'C';
+    }
+
+    // Vehicles collection rules
+    match /vehicles/{vehicleId} {
+      allow read: if isAuthenticated();
+      // 允許任何已認證用戶創建和更新車輛資訊
+      // 刪除操作仍然只允許管理員執行
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+      
+      // 車輛維修部件子集合規則
+      match /repairParts/{repairPartId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Settings collection rules
+    match /settings/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+    	allow read: if request.auth != null && (request.auth.uid == userId || isAuthenticated());
+    }
+
+    // Brands collection rules
+    match /brands/{brandId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Models collection rules
+    match /models/{modelId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // CC Values collection rules
+    match /cc_values/{ccValueId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

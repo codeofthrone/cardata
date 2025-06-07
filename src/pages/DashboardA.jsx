@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
 import { collection, getDocs, doc, getDoc, addDoc, serverTimestamp, setDoc, updateDoc, query, where } from "firebase/firestore";
+import { addVehicleRepairPart } from "../utils/firestoreVehicleRepairs";
 import { Helmet } from "react-helmet";
 import SaveIcon from '@mui/icons-material/Save';
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
@@ -15,6 +16,8 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import NoteIcon from '@mui/icons-material/Note';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 export default function DashboardA() {
   const [brands, setBrands] = useState([]);
@@ -33,6 +36,11 @@ export default function DashboardA() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showRepairModal, setShowRepairModal] = useState(false);
+  const [repairParts, setRepairParts] = useState([{ part: '', cost: '' }]);
+  const [savedVehicleId, setSavedVehicleId] = useState(null);
+  const [totalRepairCost, setTotalRepairCost] = useState(0);
+  const [repairPartsList, setRepairPartsList] = useState([]);
 
   // 顏色、車型類別和年份選項狀態
   const [colorOptions, setColorOptions] = useState([]);
@@ -362,7 +370,162 @@ export default function DashboardA() {
     ? currentCCsRaw.filter(cc => typeof cc === 'string' || typeof cc === 'number')
     : [];
     
-  // 保存車輛資訊到Firebase
+  // Add repair part
+  const addRepairPart = () => {
+    setRepairParts([...repairParts, { part: '', cost: '' }]);
+  };
+
+  // Remove repair part
+  const removeRepairPart = (index) => {
+    const newParts = repairParts.filter((_, i) => i !== index);
+    setRepairParts(newParts);
+    calculateTotalCost(newParts);
+  };
+
+  // Update repair part
+  const updateRepairPart = (index, field, value) => {
+    const newParts = repairParts.map((part, i) => {
+      if (i === index) {
+        return { ...part, [field]: value };
+      }
+      return part;
+    });
+    setRepairParts(newParts);
+    calculateTotalCost(newParts);
+  };
+
+  // Calculate total repair cost
+  const calculateTotalCost = (parts) => {
+    const total = parts.reduce((sum, part) => {
+      const cost = parseFloat(part.cost) || 0;
+      return sum + cost;
+    }, 0);
+    setTotalRepairCost(total);
+  };
+
+  // 處理維修部位變更，只更新本地狀態
+  const handleRepairPartChange = (index, value) => {
+    // 只更新本地狀態
+    updateRepairPart(index, 'part', value);
+  };
+
+  // Save repair information
+  const saveRepairInfo = async () => {
+    if (!savedVehicleId) return;
+
+    try {
+      // 檢查並保存新的維修部位到選項列表
+      const newRepairParts = repairParts
+        .map(part => part.part)
+        .filter(part => part && !repairPartsList.includes(part));
+
+      if (newRepairParts.length > 0) {
+        // 更新本地狀態
+        const updatedParts = [...repairPartsList, ...newRepairParts];
+        setRepairPartsList(updatedParts);
+        
+        // 更新Firestore資料庫
+        const optionsRef = doc(db, "settings", "options");
+        await updateDoc(optionsRef, { repairParts: updatedParts });
+        console.log(`已將新的維修部位 ${newRepairParts.join(', ')} 新增到資料庫`);
+      }
+
+      // 為每個維修項目創建車輛子集合中的維修記錄
+      const repairPromises = repairParts.map(async (part) => {
+        if (!part.part || !part.cost) return null;
+
+        const repairData = {
+          item: part.part,
+          cost: parseFloat(part.cost) || 0,
+          status: "pending",
+          date: new Date().toISOString().split('T')[0],
+          location: "維修廠",
+          partNumber: "", // 可以後續添加
+          userId: auth.currentUser.uid
+        };
+
+        // 使用新的函數將維修部件添加到車輛子集合
+        return addVehicleRepairPart(savedVehicleId, repairData);
+      });
+
+      // 等待所有維修記錄創建完成
+      await Promise.all(repairPromises.filter(Boolean));
+      
+      setShowRepairModal(false);
+      setRepairParts([{ part: '', cost: '' }]);
+      setTotalRepairCost(0);
+      
+      // 重置表單
+      setSelectedBrand("");
+      setSelectedModel("");
+      setSelectedCC("");
+      setSelectedYear("");
+      setSelectedColor("");
+      setSelectedType("");
+      setPlateNumber("");
+      setEquipment("");
+      setCategory("");
+      setLocation("");
+      setDeposit("");
+      setNotes("");
+      
+      alert('維修資訊已成功儲存！');
+    } catch (error) {
+      console.error("保存維修資訊時出錯:", error);
+      alert(`保存維修資訊失敗: ${error.message}`);
+    }
+  };
+
+  // 獲取維修部位列表
+  useEffect(() => {
+    const fetchRepairPartsList = async () => {
+      try {
+        const optionsRef = doc(db, "settings", "options");
+        const optionsDoc = await getDoc(optionsRef);
+        
+        if (optionsDoc.exists()) {
+          const optionsData = optionsDoc.data();
+          
+          // 設置維修部位選項
+          if (optionsData.repairParts && Array.isArray(optionsData.repairParts)) {
+            setRepairPartsList(optionsData.repairParts);
+          } else {
+            // 默認維修部位選項
+            const defaultRepairParts = [
+              "引擎", "變速箱", "煞車系統", "懸吊系統", "輪胎",
+              "電瓶", "冷氣系統", "車身鈑金", "烤漆", "電系",
+              "底盤", "傳動系統", "排氣系統", "其他"
+            ];
+            setRepairPartsList(defaultRepairParts);
+            // 保存默認維修部位到Firestore
+            await updateDoc(optionsRef, { repairParts: defaultRepairParts });
+          }
+        } else {
+          // 如果文檔不存在，創建它並設置默認值
+          const defaultRepairParts = [
+            "引擎", "變速箱", "煞車系統", "懸吊系統", "輪胎",
+            "電瓶", "冷氣系統", "車身鈑金", "烤漆", "電系",
+            "底盤", "傳動系統", "排氣系統", "其他"
+          ];
+          await setDoc(optionsRef, { repairParts: defaultRepairParts });
+          setRepairPartsList(defaultRepairParts);
+        }
+      } catch (error) {
+        console.error("獲取維修部位列表時出錯:", error);
+        // 設置默認值
+        const defaultRepairParts = [
+          "引擎", "變速箱", "煞車系統", "懸吊系統", "輪胎",
+          "電瓶", "冷氣系統", "車身鈑金", "烤漆", "電系",
+          "底盤", "傳動系統", "排氣系統", "其他"
+        ];
+        setRepairPartsList(defaultRepairParts);
+      }
+    };
+    
+    fetchRepairPartsList();
+  }, []);
+
+  // Modify the existing saveVehicleInfo function
   const saveVehicleInfo = async (isDraft = false) => {
     if (!selectedBrand || !selectedModel) {
       alert('請至少選擇品牌和車型');
@@ -416,31 +579,19 @@ export default function DashboardA() {
         updatedAt: serverTimestamp(),
         createdBy: auth.currentUser.uid, // 添加創建者ID
         email: auth.currentUser.email, // 添加用戶email
-        company: userCompany // 添加用戶公司信息
+        company: userCompany, // 添加用戶公司信息
       };
       
-      // 保存到Firebase
+      // Save to Firebase
       const docRef = await addDoc(collection(db, "vehicles"), vehicleData);
       console.log("車輛資訊已保存，文檔ID:", docRef.id);
+      setSavedVehicleId(docRef.id);
       
-      // 顯示成功訊息
+      // Show success message
       setSaveSuccess(true);
       
-      // 如果不是草稿，則重置表單
-      if (!isDraft) {
-        setSelectedBrand("");
-        setSelectedModel("");
-        setSelectedCC("");
-        setSelectedYear("");
-        setSelectedColor("");
-        setSelectedType("");
-        setPlateNumber("");
-        setEquipment("");
-        setCategory("");
-        setLocation("");
-        setDeposit("");
-        setNotes("");
-      }
+      // Show repair modal instead of resetting form
+      setShowRepairModal(true);
       
       // 3秒後隱藏成功訊息
       setTimeout(() => {
@@ -462,21 +613,6 @@ export default function DashboardA() {
         <title>新增車輛資訊</title>
       </Helmet>
       
-      <div className="row mb-4 align-items-center">
-        <div className="col">
-          <h1 className="fw-bold d-flex align-items-center gap-2">
-            <DirectionsCarIcon className="text-primary" />
-            新增車輛資訊
-          </h1>
-        </div>
-        <div className="col-auto">
-          <small className="text-muted d-flex align-items-center gap-2">
-            <CalendarTodayIcon className="text-muted" />
-            {new Date().toLocaleDateString('zh-TW')}
-          </small>
-        </div>
-      </div>
-
       <div className="card shadow mb-4">
         <div className="card-body">
           <div className="row g-3">
@@ -723,6 +859,96 @@ export default function DashboardA() {
         </div>
       </div>
       
+      {/* Repair Modal */}
+      {showRepairModal && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">新增維修資訊</h5>
+                <button type="button" className="btn-close" onClick={() => setShowRepairModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <button 
+                    className="btn btn-outline-primary d-flex align-items-center gap-2"
+                    onClick={addRepairPart}
+                  >
+                    <AddIcon />
+                    新增維修部位
+                  </button>
+                </div>
+
+                {repairParts.map((part, index) => (
+                  <div key={index} className="row g-3 mb-3 align-items-center">
+                    <div className="col-md-5">
+                      <input
+                        type="text"
+                        className="form-control"
+                        list={`repairPartsList-${index}`}
+                        placeholder="請選擇或輸入維修部位"
+                        value={part.part}
+                        onChange={(e) => handleRepairPartChange(index, e.target.value)}
+                      />
+                      <datalist id={`repairPartsList-${index}`}>
+                        {repairPartsList.map((repairPart) => (
+                          <option key={repairPart} value={repairPart}>
+                            {repairPart}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="col-md-5">
+                      <input
+                        type="number"
+                        className="form-control"
+                        placeholder="金額"
+                        value={part.cost}
+                        onChange={(e) => updateRepairPart(index, 'cost', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-md-2">
+                      <button
+                        className="btn btn-outline-danger"
+                        onClick={() => removeRepairPart(index)}
+                        disabled={repairParts.length === 1}
+                      >
+                        <DeleteIcon />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="row mt-3">
+                  <div className="col-md-6 offset-md-6">
+                    <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                      <span className="fw-bold">總金額：</span>
+                      <span className="fw-bold">NT$ {totalRepairCost.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowRepairModal(false)}
+                >
+                  取消
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  onClick={saveRepairInfo}
+                >
+                  儲存維修資訊
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 成功提示 */}
       {saveSuccess && (
         <div className="alert alert-success d-flex align-items-center mb-4" role="alert">
@@ -742,6 +968,11 @@ export default function DashboardA() {
           {saving ? "儲存中..." : "儲存"}
         </button>
       </div>
+
+      {/* Modal Backdrop */}
+      {showRepairModal && (
+        <div className="modal-backdrop fade show"></div>
+      )}
     </div>
   );
 }

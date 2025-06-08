@@ -478,7 +478,7 @@ export default function DashboardB() {
 
   // 彙總每台車輛的總花費
   const calculateVehicleCosts = () => {
-    console.log("calculateVehicleCosts is running."); // Debugging log
+
     const costs = {};
     
     // 初始化所有車輛的成本對象
@@ -513,8 +513,8 @@ export default function DashboardB() {
   const vehicleCosts = calculateVehicleCosts();
 
   // 狀態分類
-  const pendingRepairs = repairs.filter(r => r.status === "pending");
-  const doneRepairs = repairs.filter(r => r.status === "done");
+  const pendingRepairs = repairs.filter(r => r.status === "pending" && !vehicles.find(v => v.id === r.vehicleId)?.sold);
+  const doneRepairs = repairs.filter(r => r.status === "done" && !vehicles.find(v => v.id === r.vehicleId)?.sold);
 
   // 處理車牌點擊
   const handlePlateClick = (vehicle) => {
@@ -753,11 +753,6 @@ export default function DashboardB() {
                 {filteredVehicles.map((vehicle) => {
                   const vehicleRepairCount = repairs.filter(r => r.vehicleId === vehicle.id).length;
                   
-                  // 為車輛 2576-BUU 添加除錯資訊
-                  if (vehicle.plateNumber === '2576-BUU') {
-                    console.log(`車輛 ${vehicle.plateNumber} (ID: ${vehicle.id}) 的維修記錄數量:`, vehicleRepairCount);
-                    console.log(`該車輛相關的維修記錄:`, repairs.filter(r => r.vehicleId === vehicle.id));
-                  }
                   
                   return (
                   <tr key={vehicle.id}>

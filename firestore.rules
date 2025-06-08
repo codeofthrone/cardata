@@ -47,7 +47,10 @@ service cloud.firestore {
 
     // Users collection rules
     match /users/{userId} {
-    	allow read: if request.auth != null && (request.auth.uid == userId || isAuthenticated());
+      // 允許未認證用戶讀取 company 欄位（用於登入頁面的公司選擇）
+      allow read: if request.auth == null && resource.data.keys().hasOnly(['company']) ||
+                     request.auth != null && (request.auth.uid == userId || isAuthenticated());
+      allow write: if isAuthenticated();
     }
 
     // Brands collection rules
